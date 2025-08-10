@@ -1,4 +1,5 @@
 const DashboardPage = ({ user, onLogout, sessions, loading, error, onStartAttendance }) => {
+    console.log("sessions ", sessions)
     const formatDate = (dateString) => {
         const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
         return new Date(dateString).toLocaleDateString('en-US', options);
@@ -28,7 +29,7 @@ const DashboardPage = ({ user, onLogout, sessions, loading, error, onStartAttend
                         {sessions.map((session, index) => (
                             <div key={session.id || index} className="bg-gray-900 border border-gray-800 shadow-lg rounded-lg p-6 flex flex-col justify-between">
                                 <div>
-                                    <h3 className="text-xl font-bold text-[#FFC540]">{session.course_name}</h3>
+                                    <h3 className="text-xl font-bold text-[#FFC540]">{session.section.course.name}</h3>
                                     <p className="text-sm text-gray-400 mb-4">{session.faculty_name}</p>
                                     <p className="text-gray-300"><span className="font-semibold">When:</span> {formatDate(session.session_datetime)}</p>
                                     <p className="text-gray-300"><span className="font-semibold">Venue:</span> {session.venue}</p>
