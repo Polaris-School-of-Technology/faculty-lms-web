@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import supabase from './config/supabase';
 import api from './utils/api';
+import { QR_REFRESH_TIME, QR_REFRESH_INTERVAL, MAX_QR_REQUESTS } from './constants/app';
 
 // Components
 import LoginPage from './components/pages/LoginPage';
@@ -13,13 +14,17 @@ export default function App() {
   const [view, setView] = useState('login'); // 'login', 'dashboard', 'qr'
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  
+
   const [upcomingSessions, setUpcomingSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [qrToken, setQrToken] = useState(null);
-  const [countdown, setCountdown] = useState(10);
-  
-  const qrIntervalRef = useRef(null);
+  const [countdown, setCountdown] = useState(QR_REFRESH_TIME);
+  const [requestCount, setRequestCount] = useState(0);
+
+  // --- Refs for timers and counters ---
+  const qrGenerationTimeoutRef = useRef(null);
+  const countdownIntervalRef = useRef(null);
+  const requestCountRef = useRef(0);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -63,32 +68,54 @@ export default function App() {
     fetchSessions();
   }, [session, view]);
 
+  // --- Corrected QR Generation Logic ---
   useEffect(() => {
+    // Only run this effect when we are on the QR page with a selected session
     if (view === 'qr' && selectedSession) {
-      const generateAndRefreshQr = async () => {
+      const generateQrCode = async () => {
+        // Use the ref to check the request count
+        if (requestCountRef.current >= MAX_QR_REQUESTS) {
+          setError(`Maximum QR generations (${MAX_QR_REQUESTS}) reached.`);
+          stopQrGeneration(); // This will clear timers and switch view
+          return;
+        }
+
         try {
           setError('');
-          const response = await api.post('/api/v1/attendance/generateQrCode', { sessionId: selectedSession.id });
+          const response = await api.post('/api/v1/attendance/generateQrCode', {
+            sessionId: selectedSession.id
+          });
+
+          // Increment the ref and update the state for display
+          requestCountRef.current++;
+          setRequestCount(requestCountRef.current);
           setQrToken(response.data.token);
-          setCountdown(10); // Reset countdown
+          setCountdown(QR_REFRESH_TIME); // Reset countdown on successful generation
+
+          // Schedule the next generation using a ref for the timeout ID
+          qrGenerationTimeoutRef.current = setTimeout(generateQrCode, QR_REFRESH_INTERVAL);
+
         } catch (err) {
           setError('Failed to generate QR code: ' + err.message);
           stopQrGeneration();
         }
       };
 
-      generateAndRefreshQr();
-      qrIntervalRef.current = setInterval(generateAndRefreshQr, 10000);
-      
-      const countdownInterval = setInterval(() => {
-        setCountdown(prev => (prev > 1 ? prev - 1 : 10));
+      // Initial call to start the generation cycle
+      generateQrCode();
+
+      // Set up a separate, simple countdown timer
+      countdownIntervalRef.current = setInterval(() => {
+        setCountdown(prev => (prev > 0 ? prev - 1 : 0));
       }, 1000);
 
+      // Cleanup function to clear timers when the view changes or component unmounts
       return () => {
-        clearInterval(qrIntervalRef.current);
-        clearInterval(countdownInterval);
+        clearTimeout(qrGenerationTimeoutRef.current);
+        clearInterval(countdownIntervalRef.current);
       };
     }
+    // The dependency array is now correct, preventing the infinite loop
   }, [view, selectedSession]);
 
   const handleLogin = async (email, password) => {
@@ -115,13 +142,20 @@ export default function App() {
 
   const startQrGeneration = (session) => {
     setSelectedSession(session);
+    requestCountRef.current = 0; // Reset counter ref
+    setRequestCount(0); // Reset counter state for display
     setView('qr');
   };
 
   const stopQrGeneration = () => {
-    clearInterval(qrIntervalRef.current);
+    // Clear timers using the refs
+    clearTimeout(qrGenerationTimeoutRef.current);
+    clearInterval(countdownIntervalRef.current);
+    
     setQrToken(null);
     setSelectedSession(null);
+    requestCountRef.current = 0;
+    setRequestCount(0);
     setView('dashboard');
   };
 
@@ -132,9 +166,23 @@ export default function App() {
   const renderView = () => {
     switch(view) {
       case 'dashboard':
-        return <DashboardPage user={session.user} onLogout={handleLogout} sessions={upcomingSessions} loading={loading} error={error} onStartAttendance={startQrGeneration} />;
+        return <DashboardPage
+                 user={session.user}
+                 onLogout={handleLogout}
+                 sessions={upcomingSessions}
+                 loading={loading}
+                 error={error}
+                 onStartAttendance={startQrGeneration}
+               />;
       case 'qr':
-        return <QrDisplayPage session={selectedSession} qrToken={qrToken} countdown={countdown} onStop={stopQrGeneration} error={error} />;
+        return <QrDisplayPage
+                 session={selectedSession}
+                 qrToken={qrToken}
+                 countdown={countdown}
+                 onStop={stopQrGeneration}
+                 error={error}
+                 requestCount={requestCount}
+               />;
       case 'login':
       default:
         return <LoginPage onLogin={handleLogin} error={error} loading={loading} />;
@@ -147,5 +195,3 @@ export default function App() {
     </div>
   );
 }
-
-// --- Page Components ---

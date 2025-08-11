@@ -1,6 +1,8 @@
+import React from 'react';
 import QRCode from '../QRCode';
+import { QR_REFRESH_TIME, MAX_QR_REQUESTS } from '../../constants/app';
 
-const QrDisplayPage = ({ session, qrToken, countdown, onStop, error }) => {
+const QrDisplayPage = ({ session, qrToken, countdown, onStop, error, requestCount }) => {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-black p-4">
             <div className="w-full max-w-4xl text-center">
@@ -14,7 +16,11 @@ const QrDisplayPage = ({ session, qrToken, countdown, onStop, error }) => {
             
             <div className="mt-6 text-center">
                 {error && <p className="text-red-400 bg-red-900 bg-opacity-50 p-3 rounded-md mb-4">{error}</p>}
-                <p className="text-2xl text-gray-300">QR code refreshes in: <span className="font-bold text-[#FFC540] text-3xl">{countdown}</span>s</p>
+                <p className="text-2xl text-gray-300">
+                  QR code refreshes in: <span className="font-bold text-[#FFC540] text-3xl">{countdown}</span>s (every {QR_REFRESH_TIME}s)
+                  <br />
+                  <span className="text-lg">Requests: {requestCount}/{MAX_QR_REQUESTS}</span>
+                </p>
                 <button
                     onClick={onStop}
                     className="mt-6 py-3 px-8 border-0 rounded-md shadow-sm text-lg font-medium text-black bg-[#FFC540] hover:bg-[#e6b138] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FFC540] transition-colors"
