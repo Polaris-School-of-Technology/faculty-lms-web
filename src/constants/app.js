@@ -1,5 +1,5 @@
 // QR Code refresh time in seconds
-export const QR_REFRESH_TIME = 15;
+export const QR_REFRESH_TIME = 10;
 
 // Convert to milliseconds for JavaScript timers
 export const QR_REFRESH_INTERVAL = QR_REFRESH_TIME * 1000;
